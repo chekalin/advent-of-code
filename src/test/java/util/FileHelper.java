@@ -13,4 +13,14 @@ public class FileHelper {
         File file = new File(resourceUrl.getFile());
         return new Scanner(file);
     }
+
+    public static int[] readProgramInput(String filename) throws FileNotFoundException {
+        Scanner scanner = getScanner(filename);
+        String[] inputAsStrings = scanner.nextLine().split(",");
+        int[] input = new int[inputAsStrings.length];
+        for (int i = 0; i < inputAsStrings.length; i++) {
+            input[i] = Integer.parseInt(inputAsStrings[i]);
+        }
+        return input;
+    }
 }

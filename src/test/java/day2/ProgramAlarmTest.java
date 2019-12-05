@@ -3,11 +3,9 @@ package day2;
 import org.junit.jupiter.api.Test;
 
 import java.io.FileNotFoundException;
-import java.util.Scanner;
 
 import static org.assertj.core.api.Assertions.assertThat;
-import static org.assertj.core.api.Assertions.in;
-import static util.FileHelper.getScanner;
+import static util.FileHelper.readProgramInput;
 
 class ProgramAlarmTest {
 
@@ -21,13 +19,13 @@ class ProgramAlarmTest {
 
     @Test
     void assignment1() throws FileNotFoundException {
-        int result = runProgram(readInput(), 12, 2);
+        int result = runProgram(readProgramInput("day2/input.txt"), 12, 2);
         System.out.println("result = " + result);
     }
 
     @Test
     void assignment2() throws FileNotFoundException {
-        int[] input = readInput();
+        int[] input = readProgramInput("day2/input.txt");
         for (int noun = 0; noun < 100; noun++) {
             for (int verb = 0; verb < 100; verb++) {
                 if (runProgram(input, noun, verb) == 19690720) {
@@ -43,16 +41,6 @@ class ProgramAlarmTest {
         programCopy[1] = noun;
         programCopy[2] = verb;
         return ProgramAlarm.process(programCopy)[0];
-    }
-
-    private int[] readInput() throws FileNotFoundException {
-        Scanner scanner = getScanner("day2/input.txt");
-        String[] inputAsStrings = scanner.nextLine().split(",");
-        int[] input = new int[inputAsStrings.length];
-        for (int i = 0; i < inputAsStrings.length; i++) {
-            input[i] = Integer.parseInt(inputAsStrings[i]);
-        }
-        return input;
     }
 
 }
