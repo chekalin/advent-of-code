@@ -25,31 +25,15 @@ class AdvancedProgramStateless {
                 throw new IllegalArgumentException("Unknown operation " + operationCode + " at " + current);
             current = operation.process(program, current, input, output, parameterModes);
         }
-        return output.stream().mapToInt(i -> i).toArray();
+        return asArray(output);
     }
 
     private static LinkedList<Integer> asList(int[] inputs) {
         return Arrays.stream(inputs).boxed().collect(Collectors.toCollection(LinkedList::new));
     }
 
-    private static int extractParameter(int[] program, int programIndex, int parameterIndex, int parameterModes) {
-        int parameterMode = getNthDigitFromTheEnd(parameterModes, parameterIndex);
-        return getParameterValue(program, programIndex + 1 + parameterIndex, parameterMode);
-    }
-
-    private static int extractTargetAddressParameter(int[] program, int programIndex, int parameterIndex) {
-        // Target address value is never a reference
-        return getParameterValue(program, programIndex + 1 + parameterIndex, PARAMETER_MODE_BY_VALUE);
-    }
-
-    private static int getParameterValue(int[] program, int address, int mode) {
-        if (mode != PARAMETER_MODE_BY_REFERENCE && mode != PARAMETER_MODE_BY_VALUE)
-            throw new IllegalArgumentException("Invalid parameter mode " + mode);
-        return (mode == PARAMETER_MODE_BY_REFERENCE) ? program[program[address]] : program[address];
-    }
-
-    private static int getNthDigitFromTheEnd(int number, int positionFromTheEnd) {
-        return number / (int) Math.pow(10, positionFromTheEnd) % 10;
+    private static int[] asArray(List<Integer> output) {
+        return output.stream().mapToInt(i -> i).toArray();
     }
 
     interface Operation {
@@ -106,8 +90,29 @@ class AdvancedProgramStateless {
             };
         }
 
-        static Operation terminateOperation() {
+        private static Operation terminateOperation() {
             return (program, currentPosition, input, output, parameterModes) -> -1;
+        }
+
+        private static int extractParameter(int[] program, int programIndex, int parameterIndex, int parameterModes) {
+            int parameterMode = getParameterMode(parameterModes, parameterIndex);
+            return getParameterValue(program, programIndex + 1 + parameterIndex, parameterMode);
+        }
+
+        private static int extractTargetAddressParameter(int[] program, int programIndex, int parameterIndex) {
+            // Target address value is never a reference
+            return getParameterValue(program, programIndex + 1 + parameterIndex, PARAMETER_MODE_BY_VALUE);
+        }
+
+        private static int getParameterValue(int[] program, int address, int mode) {
+            if (mode != PARAMETER_MODE_BY_REFERENCE && mode != PARAMETER_MODE_BY_VALUE)
+                throw new IllegalArgumentException("Invalid parameter mode " + mode);
+            return (mode == PARAMETER_MODE_BY_REFERENCE) ? program[program[address]] : program[address];
+        }
+
+        private static int getParameterMode(int parameterModes, int parameterIndex) {
+            // we get n-th digit from the end from modes integer
+            return parameterModes / (int) Math.pow(10, parameterIndex) % 10;
         }
     }
 
