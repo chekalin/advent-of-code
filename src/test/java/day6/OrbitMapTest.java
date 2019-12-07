@@ -3,7 +3,6 @@ package day6;
 import day6.OrbitMap.OrbitRelationship;
 import org.junit.jupiter.api.Test;
 
-import java.io.FileNotFoundException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Scanner;
@@ -110,7 +109,7 @@ class OrbitMapTest {
     }
 
     @Test
-    void assignment() throws FileNotFoundException {
+    void assignment() {
         List<OrbitRelationship> orbits = readOrbitsFromFile();
         int result1 = OrbitMap.totalNumberOfOrbits(orbits);
         System.out.println("result1 = " + result1);
@@ -118,7 +117,7 @@ class OrbitMapTest {
         System.out.println("result2 = " + result2);
     }
 
-    private List<OrbitRelationship> readOrbitsFromFile() throws FileNotFoundException {
+    private List<OrbitRelationship> readOrbitsFromFile() {
         Scanner scanner = getScanner("day6/input.txt");
         List<OrbitRelationship> orbits = new LinkedList<>();
         while (scanner.hasNextLine()) {

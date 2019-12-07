@@ -2,7 +2,6 @@ package day3;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.FileNotFoundException;
 import java.util.Arrays;
 import java.util.List;
 import java.util.Scanner;
@@ -72,7 +71,7 @@ class CrossedWiresTest {
     }
 
     @Test
-    void assignment() throws FileNotFoundException {
+    void assignment() {
         Scanner scanner = getScanner("day3/input.txt");
 
         Function<String, List<String>> toPath =

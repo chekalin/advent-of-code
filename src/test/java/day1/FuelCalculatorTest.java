@@ -3,7 +3,6 @@ package day1;
 import org.junit.jupiter.api.Test;
 import util.FileHelper;
 
-import java.io.FileNotFoundException;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Scanner;
@@ -31,7 +30,7 @@ class FuelCalculatorTest {
     }
 
     @Test
-    void assignment() throws FileNotFoundException {
+    void assignment() {
         Scanner scanner = FileHelper.getScanner("day1/input.txt");
         List<Integer> modules = new LinkedList<>();
         while (scanner.hasNextLine()) {

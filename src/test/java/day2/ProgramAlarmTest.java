@@ -2,8 +2,6 @@ package day2;
 
 import org.junit.jupiter.api.Test;
 
-import java.io.FileNotFoundException;
-
 import static org.assertj.core.api.Assertions.assertThat;
 import static util.FileHelper.readProgramInput;
 
@@ -18,13 +16,13 @@ class ProgramAlarmTest {
     }
 
     @Test
-    void assignment1() throws FileNotFoundException {
+    void assignment1() {
         int result = runProgram(readProgramInput("day2/input.txt"), 12, 2);
         System.out.println("result = " + result);
     }
 
     @Test
-    void assignment2() throws FileNotFoundException {
+    void assignment2() {
         int[] input = readProgramInput("day2/input.txt");
         for (int noun = 0; noun < 100; noun++) {
             for (int verb = 0; verb < 100; verb++) {
