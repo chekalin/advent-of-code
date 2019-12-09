@@ -1,7 +1,5 @@
 package day5;
 
-import day5.Program.Operation.OperationResult;
-
 import java.util.Arrays;
 import java.util.LinkedList;
 import java.util.List;
@@ -12,163 +10,178 @@ import java.util.stream.Collectors;
 
 public class Program {
 
-    private static final int PARAMETER_MODE_BY_VALUE = 1;
-    private static final int PARAMETER_MODE_BY_REFERENCE = 0;
+    private static final int ABSOLUTE_PARAMETER_MODE = 1;
+    private static final int POSITIONAL_PARAMETER_MODE = 0;
+    private static final int RELATIVE_PARAMETER_MODE = 2;
 
-    private int[] program;
-    private List<Integer> inputs = new LinkedList<>();
-    private List<Integer> outputs = new LinkedList<>();
-    private State state = State.NOT_STARTED;
-    private int current = 0;
+    private static final int EXTRA_MEMORY = 2048;
 
     enum State {NOT_STARTED, RUNNING, AWAITING_INPUT, TERMINATED}
 
-    public Program(int[] program) {
-        this.program = program;
+    // visible for testing
+    long[] memory;
+    private List<Long> inputs = new LinkedList<>();
+    private List<Long> outputs = new LinkedList<>();
+    private State state = State.NOT_STARTED;
+    private int current = 0;
+    private int relativeOffset = 0;
+
+    private Program(long[] program) {
+        this.memory = new long[program.length + EXTRA_MEMORY];
+        System.arraycopy(program, 0, this.memory, 0, program.length);
     }
 
-    public void run(int... inputs) {
+    interface OperationHandler {
+        void handle();
+    }
+
+    private Map<Integer, OperationHandler> operationsByCode = Map.of(
+            1, binaryOperationHandler(Long::sum),
+            2, binaryOperationHandler((x, y) -> x * y),
+            3, this::handleInput,
+            4, this::handleOutput,
+            5, conditionalOperation(i -> i != 0),
+            6, conditionalOperation(i -> i == 0),
+            7, binaryOperationHandler((x, y) -> (x < y) ? 1L : 0L),
+            8, binaryOperationHandler((x, y) -> (x.equals(y)) ? 1L : 0L),
+            9, this::handleRelativeOffset,
+            99, this::handleTerminate
+    );
+
+    public static Program initialize(int[] programCode) {
+        return new Program(convertToArrayOfLongs(programCode));
+    }
+
+    static Program initialize(long[] programCode) {
+        return new Program(programCode);
+    }
+
+    public List<Long> getOutputs() {
+        return List.copyOf(this.outputs);
+    }
+
+    public Program run(long... inputs) {
         if (this.state == State.TERMINATED) throw new IllegalStateException("The program already terminated");
         this.state = State.RUNNING;
         this.inputs.addAll(asList(inputs));
         while (this.state == State.RUNNING) {
-            int operationCode = program[this.current] % 100;
-            int parameterModes = program[this.current] / 100;
-            Operation operation = Operation.BY_CODE.get(operationCode);
-            if (operation == null)
-                throw new IllegalArgumentException("Unknown operation " + operationCode + " at " + this.current);
-            OperationResult result = operation.process(this.program, this.current, this.inputs, this.outputs, parameterModes);
-            this.current = result.nextPosition;
-            this.state = result.nextState;
+            int operationCode = (int) memory[this.current] % 100;
+            resolveOperationByCode(operationCode).handle();
         }
+        return this;
+    }
+
+    private OperationHandler resolveOperationByCode(int operationCode) {
+        OperationHandler operationHandler = operationsByCode.get(operationCode);
+        if (operationHandler == null)
+            throw new IllegalArgumentException("Unknown operation " + operationCode + " at " + this.current);
+        return operationHandler;
+    }
+
+    private int parameterModes() {
+        return (int) memory[this.current] / 100;
     }
 
     public boolean isComplete() {
         return this.state == State.TERMINATED;
     }
 
-    public int getLatestOutput() {
+    public long getLatestOutput() {
         if (outputs.isEmpty()) throw new IllegalArgumentException("There are no outputs");
         return outputs.get(outputs.size() - 1);
     }
 
-    public static int[] process(int[] programCode, int... inputs) {
-        Program program = new Program(programCode);
-        program.run(inputs);
-        return asArray(program.outputs);
+    private OperationHandler binaryOperationHandler(BiFunction<Long, Long, Long> operation) {
+        return () -> {
+            long left = extractParameter(0);
+            long right = extractParameter(1);
+            int target = extractTargetAddressParameter(2);
+            this.memory[target] = operation.apply(left, right);
+            this.current += 4;
+        };
     }
 
-    private static LinkedList<Integer> asList(int[] inputs) {
+    private OperationHandler conditionalOperation(Predicate<Long> condition) {
+        return () -> {
+            long parameter = extractParameter(0);
+            this.current = condition.test(parameter)
+                    ? (int) extractParameter(1)
+                    : this.current + 3;
+        };
+    }
+
+    private void handleInput() {
+        if (this.inputs.isEmpty()) {
+            this.state = State.AWAITING_INPUT;
+        } else {
+            int targetPosition = extractTargetAddressParameter(0);
+            memory[targetPosition] = this.inputs.remove(0);
+            this.current += 2;
+        }
+    }
+
+    private void handleOutput() {
+        this.outputs.add(extractParameter(0));
+        this.current += 2;
+    }
+
+    private void handleTerminate() {
+        this.state = State.TERMINATED;
+    }
+
+    private void handleRelativeOffset() {
+        this.relativeOffset += (int) extractParameter(0);
+        this.current += 2;
+    }
+
+    private long extractParameter(int parameterIndex) {
+        int parameterMode = getParameterMode(parameterModes(), parameterIndex);
+        return getParameterValue(this.current + 1 + parameterIndex, parameterMode);
+    }
+
+    private int extractTargetAddressParameter(int parameterIndex) {
+        int mode = getParameterMode(parameterModes(), parameterIndex);
+        switch (mode) {
+            case POSITIONAL_PARAMETER_MODE:
+                return (int) this.memory[this.current + 1 + parameterIndex];
+            case RELATIVE_PARAMETER_MODE:
+                return (int) this.memory[this.current + 1 + parameterIndex] + this.relativeOffset;
+            case ABSOLUTE_PARAMETER_MODE:
+                throw new IllegalArgumentException("Absolute parameter mode is not supported for target address");
+            default:
+                throw new IllegalArgumentException("Invalid parameter mode " + mode);
+        }
+    }
+
+    private long getParameterValue(int address, int mode) {
+        switch (mode) {
+            case POSITIONAL_PARAMETER_MODE:
+                return this.memory[(int) this.memory[address]];
+            case RELATIVE_PARAMETER_MODE:
+                int relativeAddress = (int) this.memory[address];
+                return this.memory[relativeAddress + this.relativeOffset];
+            case ABSOLUTE_PARAMETER_MODE:
+                return this.memory[address];
+            default:
+                throw new IllegalArgumentException("Invalid parameter mode " + mode);
+        }
+    }
+
+    private static int getParameterMode(int parameterModes, int parameterIndex) {
+        // we get n-th digit from the end from modes integer
+        return parameterModes / (int) Math.pow(10, parameterIndex) % 10;
+    }
+
+    private static List<Long> asList(long[] inputs) {
         return Arrays.stream(inputs).boxed().collect(Collectors.toCollection(LinkedList::new));
     }
 
-    private static int[] asArray(List<Integer> output) {
-        return output.stream().mapToInt(i -> i).toArray();
-    }
-
-
-    interface Operation {
-        OperationResult process(int[] program, int currentPosition, List<Integer> input, List<Integer> output, int parameterModes);
-
-        Map<Integer, Operation> BY_CODE = Map.of(
-                1, binaryOperation(Integer::sum),
-                2, binaryOperation((x, y) -> x * y),
-                3, inputOperation(),
-                4, outputOperation(),
-                5, conditionalOperation(i -> i != 0),
-                6, conditionalOperation(i -> i == 0),
-                7, binaryOperation((x, y) -> (x < y) ? 1 : 0),
-                8, binaryOperation((x, y) -> (x.equals(y)) ? 1 : 0),
-                99, (program1, currentPosition, input, output, parameterModes) -> terminate()
-        );
-
-        private static Operation binaryOperation(BiFunction<Integer, Integer, Integer> operation) {
-            return (program, currentPosition, input, output, parameterModes) -> {
-                int left = extractParameter(program, currentPosition, 0, parameterModes);
-                int right = extractParameter(program, currentPosition, 1, parameterModes);
-                int target = extractTargetAddressParameter(program, currentPosition, 2);
-                program[target] = operation.apply(left, right);
-                return continueAt(currentPosition + 4);
-            };
+    private static long[] convertToArrayOfLongs(int[] program) {
+        long[] programAsLong = new long[program.length];
+        for (int i = 0; i < program.length; i++) {
+            programAsLong[i] = program[i];
         }
-
-        private static Operation conditionalOperation(Predicate<Integer> condition) {
-            return (program, currentPosition, input, output, parameterModes) -> {
-                int parameter = extractParameter(program, currentPosition, 0, parameterModes);
-                if (condition.test(parameter)) {
-                    return continueAt(extractParameter(program, currentPosition, 1, parameterModes));
-                } else {
-                    return continueAt(currentPosition + 3);
-                }
-            };
-        }
-
-        private static Operation inputOperation() {
-            return (program, currentPosition, input, output, parameterModes) -> {
-                if (input.isEmpty()) {
-                    return awaitInput(currentPosition);
-                }
-                int targetPosition = extractTargetAddressParameter(program, currentPosition, 0);
-                program[targetPosition] = input.remove(0);
-                return continueAt(currentPosition + 2);
-            };
-        }
-
-        private static Operation outputOperation() {
-            return (program, currentPosition, input, output, parameterModes) -> {
-                output.add(extractParameter(program, currentPosition, 0, parameterModes));
-                return continueAt(currentPosition + 2);
-            };
-        }
-
-        private static int extractParameter(int[] program, int programIndex, int parameterIndex, int parameterModes) {
-            int parameterMode = getParameterMode(parameterModes, parameterIndex);
-            return getParameterValue(program, programIndex + 1 + parameterIndex, parameterMode);
-        }
-
-        private static int extractTargetAddressParameter(int[] program, int programIndex, int parameterIndex) {
-            // Target address value is never a reference
-            return getParameterValue(program, programIndex + 1 + parameterIndex, PARAMETER_MODE_BY_VALUE);
-        }
-
-        private static int getParameterValue(int[] program, int address, int mode) {
-            if (mode != PARAMETER_MODE_BY_REFERENCE && mode != PARAMETER_MODE_BY_VALUE)
-                throw new IllegalArgumentException("Invalid parameter mode " + mode);
-            return (mode == PARAMETER_MODE_BY_REFERENCE) ? program[program[address]] : program[address];
-        }
-
-        private static int getParameterMode(int parameterModes, int parameterIndex) {
-            // we get n-th digit from the end from modes integer
-            return parameterModes / (int) Math.pow(10, parameterIndex) % 10;
-        }
-
-        static OperationResult continueAt(int nextPosition) {
-            return new OperationResult(State.RUNNING, nextPosition);
-        }
-
-        static OperationResult awaitInput(int nextPosition) {
-            return new OperationResult(State.AWAITING_INPUT, nextPosition);
-        }
-
-        static OperationResult terminate() {
-            return new OperationResult(State.TERMINATED, -1);
-        }
-
-        class OperationResult {
-            private State nextState;
-            private int nextPosition;
-
-            private OperationResult(State nextState, int nextPosition) {
-                this.nextState = nextState;
-                this.nextPosition = nextPosition;
-            }
-        }
-
-        class NotEnoughInputsException extends RuntimeException {
-            NotEnoughInputsException() {
-                super("Not enough inputs");
-            }
-        }
+        return programAsLong;
     }
 
 }

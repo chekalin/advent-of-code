@@ -8,18 +8,17 @@ import java.util.stream.IntStream;
 
 class PhaseSettings {
 
-    static int calculateThrusterOutput(int[] program, List<Integer> phaseSettings) {
-        int latestOutput = 0;
+    static long calculateThrusterOutput(int[] program, List<Integer> phaseSettings) {
+        long latestOutput = 0;
         for (int phaseSetting : phaseSettings) {
-            int[] outputs = Program.process(program.clone(), phaseSetting, latestOutput);
-            latestOutput = outputs[0];
+            latestOutput = Program.initialize(program).run(phaseSetting, latestOutput).getLatestOutput();
         }
         return latestOutput;
     }
 
-    static int calculateMaxThrusterOutput(int[] program) {
+    static long calculateMaxThrusterOutput(int[] program) {
         return combinations(5).stream()
-                .mapToInt(phaseSettings -> calculateThrusterOutput(program, phaseSettings))
+                .mapToLong(phaseSettings -> calculateThrusterOutput(program, phaseSettings))
                 .max().orElseThrow();
     }
 
@@ -46,27 +45,25 @@ class PhaseSettings {
         }
     }
 
-    static int calculateFeedbackThrusterOutput(int[] programCode, List<Integer> phaseSettings) {
+    static long calculateFeedbackThrusterOutput(int[] programCode, List<Integer> phaseSettings) {
         List<Program> amplifiers = new LinkedList<>();
-        int latestOutput = 0;
+        long latestOutput = 0;
         for (Integer phaseSetting : phaseSettings) {
-            Program amplifier = new Program(programCode.clone());
-            amplifier.run(phaseSetting, latestOutput);
-            latestOutput = amplifier.getLatestOutput();
+            Program amplifier = Program.initialize(programCode);
             amplifiers.add(amplifier);
+            latestOutput = amplifier.run(phaseSetting, latestOutput).getLatestOutput();
         }
         while (!amplifiers.stream().allMatch(Program::isComplete)) {
             for (Program amplifier : amplifiers) {
-                amplifier.run(latestOutput);
-                latestOutput = amplifier.getLatestOutput();
+                latestOutput = amplifier.run(latestOutput).getLatestOutput();
             }
         }
         return latestOutput;
     }
 
-    static int calculateFeedbackThrusterMaxOutput(int[] program) {
+    static long calculateFeedbackThrusterMaxOutput(int[] program) {
         return combinations(5, 5).stream()
-                .mapToInt(phaseSettings -> calculateFeedbackThrusterOutput(program, phaseSettings))
+                .mapToLong(phaseSettings -> calculateFeedbackThrusterOutput(program, phaseSettings))
                 .max().orElseThrow();
     }
 }
